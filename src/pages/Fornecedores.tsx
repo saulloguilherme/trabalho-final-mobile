@@ -210,31 +210,58 @@ export default function FornecedoresScreen() {
 const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  titulo: { fontSize: 28, fontWeight: '700', color: '#1e293b' },
-  subtitulo: { fontSize: 14, color: '#64748b' },
-  resumo: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 },
-  cardResumo: { width: (width - 48) / 2, marginBottom: 12 },
-  label: { fontSize: 12, color: '#64748b' },
-  valor: { fontSize: 20, fontWeight: '700' },
-  input: { marginBottom: 16 },
-  card: { marginBottom: 16 },
-  linhaTopo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  fornecedor: { fontSize: 16, fontWeight: '600' },
-  id: { fontSize: 12, color: '#64748b' },
-  descricao: { fontSize: 14, color: '#475569', marginBottom: 12 },
-  linhaInfo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  small: { fontSize: 12, color: '#64748b' },
-  valorItem: { fontSize: 16, fontWeight: '600' },
-  data: { fontSize: 14 },
-  badge: { alignSelf: 'flex-start' },
-  pago: { backgroundColor: '#dcfce7' },
-  pendente: { backgroundColor: '#fef9c3' },
-  atrasado: { backgroundColor: '#fee2e2' },
-  alerta: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
-  alertaLinha: { flexDirection: 'row', alignItems: 'center' },
-  alertaTitulo: { fontSize: 14, fontWeight: '600', color: '#991b1b' },
-  alertaTexto: { fontSize: 12, color: '#7f1d1d' },
+  container: {
+   flex: 1, backgroundColor: '#f8fafc' },
+  scroll: {
+   padding: 16 },
+  header: {
+   flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  titulo: {
+   fontSize: 28, fontWeight: '700', color: '#1e293b' },
+  subtitulo: {
+   fontSize: 14, color: '#64748b' },
+  resumo: {
+   flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 },
+  cardResumo: {
+   width: (width - 48) / 2, marginBottom: 12 },
+  label: {
+   fontSize: 12, color: '#64748b' },
+  valor: {
+   fontSize: 20, fontWeight: '700' },
+  input: {
+   marginBottom: 16 },
+  card: {
+   marginBottom: 16 },
+  linhaTopo: {
+   flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  fornecedor: {
+   fontSize: 16, fontWeight: '600' },
+  id: {
+   fontSize: 12, color: '#64748b' },
+  descricao: {
+   fontSize: 14, color: '#475569', marginBottom: 12 },
+  linhaInfo: {
+   flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  small: {
+   fontSize: 12, color: '#64748b' },
+  valorItem: {
+   fontSize: 16, fontWeight: '600' },
+  data: {
+   fontSize: 14 },
+  badge: {
+   alignSelf: 'flex-start' },
+  pago: {
+   backgroundColor: '#dcfce7' },
+  pendente: {
+   backgroundColor: '#fef9c3' },
+  atrasado: {
+   backgroundColor: '#fee2e2' },
+  alerta: {
+   backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  alertaLinha: {
+   flexDirection: 'row', alignItems: 'center' },
+  alertaTitulo: {
+   fontSize: 14, fontWeight: '600', color: '#991b1b' },
+  alertaTexto: {
+   fontSize: 12, color: '#7f1d1d' },
 });
