@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   ScrollView,
   View,
@@ -7,7 +7,9 @@ import {
   SafeAreaView,
   TextInput,
   Dimensions,
-} from 'react-native';
+  ActivityIndicator,
+  RefreshControl
+} from 'react-native'
 import {
   Card,
   Button,
@@ -16,72 +18,112 @@ import {
   Portal,
   Provider,
   SegmentedButtons,
-  ProgressBar,
-} from 'react-native-paper';
-import Ionicons from '@expo/vector-icons/Ionicons';
-
-interface ProdutoEstoque {
-  id: string;
-  nome: string;
-  tipo: string;
-  quantidade: number;
-  minimo: number;
-  maximo: number;
-  cheios: number;
-  vazios: number;
-  localizacao: string;
-}
-
-const estoqueInicial: ProdutoEstoque[] = [
-  { id: 'EST-001', nome: 'Botijão P13', tipo: 'P13', quantidade: 45, minimo: 30, maximo: 100, cheios: 45, vazios: 18, localizacao: 'Setor A' },
-  { id: 'EST-002', nome: 'Botijão P20', tipo: 'P20', quantidade: 62, minimo: 40, maximo: 120, cheios: 62, vazios: 25, localizacao: 'Setor A' },
-  { id: 'EST-003', nome: 'Botijão P45', tipo: 'P45', quantidade: 28, minimo: 20, maximo: 60, cheios: 28, vazios: 12, localizacao: 'Setor B' },
-  { id: 'EST-004', nome: 'Botijão P8', tipo: 'P8', quantidade: 15, minimo: 25, maximo: 50, cheios: 15, vazios: 8, localizacao: 'Setor B' },
-];
+  ProgressBar
+} from 'react-native-paper'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import { getEstoque, getEstoqueMetrics, updateEstoqueQuantidade, ProdutoEstoque } from '../services/estoque'
 
 export default function EstoqueScreen() {
-  const [estoque, setEstoque] = useState<ProdutoEstoque[]>(estoqueInicial);
-  const [modalVisivel, setModalVisivel] = useState(false);
-  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoEstoque | null>(null);
-  const [tipo, setTipo] = useState<'entrada' | 'saida'>('entrada');
-  const [quantidade, setQuantidade] = useState('0');
+  const [estoque, setEstoque] = useState<ProdutoEstoque[]>([])
+  const [modalVisivel, setModalVisivel] = useState(false)
+  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoEstoque | null>(null)
+  const [tipo, setTipo] = useState<'entrada' | 'saida'>('entrada')
+  const [quantidade, setQuantidade] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [metrics, setMetrics] = useState({
+    totalCheios: 0,
+    totalVazios: 0,
+    alertas: 0,
+    capacidadePercent: 0
+  })
 
-  const totalCheios = estoque.reduce((a, b) => a + b.quantidade, 0);
-  const totalVazios = estoque.reduce((a, b) => a + b.vazios, 0);
-  const alertas = estoque.filter((p) => p.quantidade < p.minimo).length;
+  useEffect(() => {
+    loadEstoqueData()
+  }, [])
+
+  async function loadEstoqueData() {
+    try {
+      const [estoqueData, metricsData] = await Promise.all([
+        getEstoque(),
+        getEstoqueMetrics()
+      ])
+      
+      setEstoque(estoqueData)
+      setMetrics(metricsData)
+    } catch (error) {
+      console.error('Erro ao carregar estoque:', error)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  function onRefresh() {
+    setRefreshing(true)
+    loadEstoqueData()
+  }
 
   const statusInfo = (p: ProdutoEstoque) => {
-    if (p.quantidade < p.minimo) return { label: 'Crítico', color: '#fee2e2', icon: 'alert' };
-    if (p.quantidade < p.minimo * 1.5) return { label: 'Baixo', color: '#fef3c7', icon: 'trending-down' };
-    return { label: 'Normal', color: '#dcfce7', icon: 'trending-up' };
-  };
+    if (p.quantidade_cheios < p.quantidade_minima) return { label: 'Crítico', color: '#fee2e2', icon: 'alert' }
+    if (p.quantidade_cheios < p.quantidade_minima * 1.5) return { label: 'Baixo', color: '#fef3c7', icon: 'trending-down' }
+    return { label: 'Normal', color: '#dcfce7', icon: 'trending-up' }
+  }
 
-  const confirmarAjuste = () => {
-    if (!produtoSelecionado) return;
-    const qtd = parseInt(quantidade) || 0;
+  const confirmarAjuste = async () => {
+    if (!produtoSelecionado) return
+    const qtd = parseInt(quantidade) || 0
+    if (qtd <= 0) return
 
-    setEstoque((prev) =>
-      prev.map((p) =>
-        p.id === produtoSelecionado.id
-          ? {
-              ...p,
-              quantidade: tipo === 'entrada' ? p.quantidade + qtd : Math.max(0, p.quantidade - qtd),
-              cheios: tipo === 'entrada' ? p.quantidade + qtd : Math.max(0, p.quantidade - qtd),
-            }
-          : p
+    try {
+      await updateEstoqueQuantidade(produtoSelecionado.id, tipo, qtd)
+      
+      setEstoque((prev) =>
+        prev.map((p) =>
+          p.id === produtoSelecionado.id
+            ? {
+                ...p,
+                quantidade_cheios: tipo === 'entrada' ? p.quantidade_cheios + qtd : Math.max(0, p.quantidade_cheios - qtd),
+              }
+            : p
+        )
       )
-    );
 
-    setModalVisivel(false);
-    setProdutoSelecionado(null);
-    setQuantidade('0');
-    setTipo('entrada');
-  };
+      setModalVisivel(false)
+      setProdutoSelecionado(null)
+      setQuantidade('')
+      setTipo('entrada')
+      
+      await loadEstoqueData()
+    } catch (error) {
+      console.error('Erro ao ajustar estoque:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <Provider>
+        <SafeAreaView style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Carregando estoque...</Text>
+        </SafeAreaView>
+      </Provider>
+    )
+  }
 
   return (
     <Provider>
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scroll}>
+        <ScrollView
+          style={styles.scroll}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#007AFF"
+            />
+          }
+        >
           <View style={styles.header}>
             <Text style={styles.titulo}>Estoque</Text>
             <Text style={styles.subtitulo}>Controle de cilindros</Text>
@@ -91,89 +133,105 @@ export default function EstoqueScreen() {
             <Card style={styles.cardResumo}>
               <Card.Content>
                 <Text style={styles.resumoLabel}>Cheios</Text>
-                <Text style={styles.resumoValor}>{totalCheios}</Text>
+                <Text style={styles.resumoValor}>{metrics.totalCheios}</Text>
               </Card.Content>
             </Card>
 
             <Card style={styles.cardResumo}>
               <Card.Content>
                 <Text style={styles.resumoLabel}>Vazios</Text>
-                <Text style={styles.resumoValor}>{totalVazios}</Text>
+                <Text style={styles.resumoValor}>{metrics.totalVazios}</Text>
               </Card.Content>
             </Card>
 
             <Card style={styles.cardResumo}>
               <Card.Content>
                 <Text style={styles.resumoLabel}>Alertas</Text>
-                <Text style={[styles.resumoValor, { color: '#dc2626' }]}>{alertas}</Text>
+                <Text style={[styles.resumoValor, { color: '#dc2626' }]}>{metrics.alertas}</Text>
               </Card.Content>
             </Card>
 
             <Card style={styles.cardResumo}>
               <Card.Content>
                 <Text style={styles.resumoLabel}>Capacidade</Text>
-                <Text style={styles.resumoValor}>68%</Text>
+                <Text style={styles.resumoValor}>{metrics.capacidadePercent}%</Text>
               </Card.Content>
             </Card>
           </View>
 
-          {estoque.map((p) => {
-            const status = statusInfo(p);
-            const progress = p.quantidade / p.maximo;
+          {estoque.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Card.Content>
+                <View style={styles.emptyContent}>
+                  <Ionicons name="archive-outline" size={48} color="#9ca3af" />
+                  <Text style={styles.emptyText}>Nenhum produto em estoque</Text>
+                </View>
+              </Card.Content>
+            </Card>
+          ) : (
+            estoque.map((p) => {
+              const status = statusInfo(p)
+              const progress = p.quantidade_cheios / p.capacidade_maxima
 
-            return (
-              <Card key={p.id} style={styles.cardProduto}>
-                <Card.Content>
-                  <View style={styles.cardTopo}>
-                    <View>
-                      <Text style={styles.nomeProduto}>{p.nome}</Text>
-                      <Text style={styles.localizacao}>{p.localizacao}</Text>
+              return (
+                <Card key={p.id} style={styles.cardProduto}>
+                  <Card.Content>
+                    <View style={styles.cardTopo}>
+                      <View>
+                        <Text style={styles.nomeProduto}>{p.nome}</Text>
+                        <Text style={styles.localizacao}>{p.tipo}</Text>
+                      </View>
+                      <Badge style={{ backgroundColor: status.color }}>{status.label}</Badge>
                     </View>
-                    <Badge style={{ backgroundColor: status.color }}>{status.label}</Badge>
-                  </View>
 
-                  <View style={styles.linhaQuantidade}>
-                    <Text style={styles.qtdTexto}>
-                      {p.quantidade} / {p.maximo}
-                    </Text>
-                  </View>
-
-                  <ProgressBar progress={progress} style={styles.progress} />
-
-                  <View style={styles.gridInfo}>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoLabel}>Cheios</Text>
-                      <Text style={styles.infoValorVerde}>{p.cheios}</Text>
+                    <View style={styles.linhaQuantidade}>
+                      <Text style={styles.qtdTexto}>
+                        {p.quantidade_cheios} / {p.capacidade_maxima}
+                      </Text>
                     </View>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoLabel}>Vazios</Text>
-                      <Text style={styles.infoValorCinza}>{p.vazios}</Text>
-                    </View>
-                    <View style={styles.infoBox}>
-                      <Text style={styles.infoLabel}>Mínimo</Text>
-                      <Text style={styles.infoValorAzul}>{p.minimo}</Text>
-                    </View>
-                  </View>
 
-                  <Button
-                    mode="outlined"
-                    onPress={() => {
-                      setProdutoSelecionado(p);
-                      setModalVisivel(true);
-                    }}
-                  >
-                    Ajustar Estoque
-                  </Button>
-                </Card.Content>
-              </Card>
-            );
-          })}
+                    <ProgressBar progress={progress} style={styles.progress} />
+
+                    <View style={styles.gridInfo}>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Cheios</Text>
+                        <Text style={styles.infoValorVerde}>{p.quantidade_cheios}</Text>
+                      </View>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Vazios</Text>
+                        <Text style={styles.infoValorCinza}>{p.quantidade_vazios}</Text>
+                      </View>
+                      <View style={styles.infoBox}>
+                        <Text style={styles.infoLabel}>Mínimo</Text>
+                        <Text style={styles.infoValorAzul}>{p.quantidade_minima}</Text>
+                      </View>
+                    </View>
+
+                    <Button
+                      mode="outlined"
+                      onPress={() => {
+                        setProdutoSelecionado(p)
+                        setModalVisivel(true)
+                      }}
+                    >
+                      Ajustar Estoque
+                    </Button>
+                  </Card.Content>
+                </Card>
+              )
+            })
+          )}
         </ScrollView>
 
         <Portal>
           <Modal
             visible={modalVisivel}
-            onDismiss={() => setModalVisivel(false)}
+            onDismiss={() => {
+              setModalVisivel(false)
+              setProdutoSelecionado(null)
+              setQuantidade('')
+              setTipo('entrada')
+            }}
             contentContainerStyle={styles.modal}
           >
             {produtoSelecionado && (
@@ -187,8 +245,8 @@ export default function EstoqueScreen() {
                   onValueChange={(v) => setTipo(v as 'entrada' | 'saida')}
                   buttons={[
                     { value: 'entrada', label: 'Entrada', icon: 'plus' },
-                    { value: 'saida', label: 'Saída', icon: 'minus' },
-                  ].map((b) => ({ ...b, icon: b.icon as keyof typeof Ionicons.glyphMap }))}
+                    { value: 'saida', label: 'Saída', icon: 'minus' }
+                  ]}
                 />
 
                 <TextInput
@@ -200,12 +258,12 @@ export default function EstoqueScreen() {
                 />
 
                 <View style={styles.resumoAjuste}>
-                  <Text>Atual: {produtoSelecionado.quantidade}</Text>
+                  <Text>Atual: {produtoSelecionado.quantidade_cheios}</Text>
                   <Text>
                     Nova:{' '}
                     {tipo === 'entrada'
-                      ? produtoSelecionado.quantidade + (parseInt(quantidade) || 0)
-                      : Math.max(0, produtoSelecionado.quantidade - (parseInt(quantidade) || 0))}
+                      ? produtoSelecionado.quantidade_cheios + (parseInt(quantidade) || 0)
+                      : Math.max(0, produtoSelecionado.quantidade_cheios - (parseInt(quantidade) || 0))}
                   </Text>
                 </View>
 
@@ -218,10 +276,10 @@ export default function EstoqueScreen() {
         </Portal>
       </SafeAreaView>
     </Provider>
-  );
+  )
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get('window')
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
@@ -250,4 +308,27 @@ const styles = StyleSheet.create({
   modalTitulo: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
   input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, padding: 12, marginVertical: 16 },
   resumoAjuste: { marginBottom: 16 },
-});
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc'
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b'
+  },
+  emptyCard: {
+    marginBottom: 16
+  },
+  emptyContent: {
+    alignItems: 'center',
+    padding: 32
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    marginTop: 16
+  }
+})
